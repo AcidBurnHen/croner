@@ -43,7 +43,7 @@ curl -fsSL https://raw.githubusercontent.com/AcidBurnHen/croner/master/installer
 ``` 
 Or pin a version:
 ```bash
-VERSION=v0.1.2 curl -fsSL https://raw.githubusercontent.com/AcidBurnHen/croner/master/installers/install.sh | sh
+VERSION=v0.1.3 curl -fsSL https://raw.githubusercontent.com/AcidBurnHen/croner/master/installers/install.sh | sh
 ```
 
 #### Windows (PowerShell)
@@ -53,17 +53,17 @@ iwr -useb https://raw.githubusercontent.com/AcidBurnHen/croner/master/installers
 
 Or pin a version:
 ```powershell
-iwr -useb https://raw.githubusercontent.com/AcidBurnHen/croner/master/installers/install.ps1 | iex -Version v0.1.2
+iwr -useb https://raw.githubusercontent.com/AcidBurnHen/croner/master/installers/install.ps1 | iex -Version v0.1.3
 ```
 
 ---
 
 ### 2. Download manually
 You can manually grab the latest binaries from:
-- **Linux** (musl): [croner-latest-x86_64-unknown-linux-musl.tar.gz](https://github.com/AcidBurnHen/croner/releases/download/v0.1.2/croner-v0.1.2-x86_64-unknown-linux-musl.tar.gz)  
-- **Windows**: [croner-latest-x86_64-pc-windows-msvc.zip](https://github.com/AcidBurnHen/croner/releases/download/v0.1.2/croner-v0.1.2-x86_64-pc-windows-msvc.zip)  
-- **macOS ARM**: [croner-latest-aarch64-apple-darwin.tar.gz](https://github.com/AcidBurnHen/croner/releases/download/v0.1.2/croner-v0.1.2-aarch64-apple-darwin.tar.gz)  
-- **macOS Intel**: [croner-latest-x86_64-apple-darwin.tar.gz](https://github.com/AcidBurnHen/croner/releases/download/v0.1.2/croner-v0.1.2-x86_64-apple-darwin.tar.gz)  
+- **Linux** (musl): [croner-latest-x86_64-unknown-linux-musl.tar.gz](https://github.com/AcidBurnHen/croner/releases/download/v0.1.3/croner-v0.1.3-x86_64-unknown-linux-musl.tar.gz)  
+- **Windows**: [croner-latest-x86_64-pc-windows-msvc.zip](https://github.com/AcidBurnHen/croner/releases/download/v0.1.3/croner-v0.1.3-x86_64-pc-windows-msvc.zip)  
+- **macOS ARM**: [croner-latest-aarch64-apple-darwin.tar.gz](https://github.com/AcidBurnHen/croner/releases/download/v0.1.3/croner-v0.1.3-aarch64-apple-darwin.tar.gz)  
+- **macOS Intel**: [croner-latest-x86_64-apple-darwin.tar.gz](https://github.com/AcidBurnHen/croner/releases/download/v0.1.3/croner-v0.1.3-x86_64-apple-darwin.tar.gz)  
 ---
 
 ### 3. From source
