@@ -9,7 +9,7 @@ It’s a complete rewrite of [PyCroner](https://github.com/AcidBurnHen/pycroner)
 PyCroner became an essential tool at my work.  
 We needed something dead simple, predictable, and able to run scheduled jobs on **both Windows and Linux** without relying on platform-specific schedulers.
 
-PyCroner solved that problem well — but as adoption grew, so did the need for even better performance and robustness.  
+PyCroner solved that problem well, but as adoption grew, so did the need for even better performance and robustness.  
 That’s why I rewrote it in Rust: to keep the simplicity, but make it **blazing fast** and capable of handling heavy workloads without breaking a sweat.
 
 Croner keeps the same goal:
