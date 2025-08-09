@@ -39,16 +39,21 @@ Precompiled executables are available on the [Releases page](https://github.com/
 
 #### macOS / Linux (curl | sh)
 ```bash
-curl -fsSL https://raw.githubusercontent.com/AcidBurnHen/croner/main/installers/install.sh | sh
-# Or pin a version:
-VERSION=v0.1.2 curl -fsSL https://raw.githubusercontent.com/AcidBurnHen/croner/main/installers/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/AcidBurnHen/croner/master/installers/install.sh | sh
+``` 
+Or pin a version:
+```bash
+VERSION=v0.1.2 curl -fsSL https://raw.githubusercontent.com/AcidBurnHen/croner/master/installers/install.sh | sh
 ```
 
 #### Windows (PowerShell)
 ```powershell
-iwr -useb https://raw.githubusercontent.com/AcidBurnHen/croner/main/installers/install.ps1 | iex
-# Or pin a version:
-iwr -useb https://raw.githubusercontent.com/AcidBurnHen/croner/main/installers/install.ps1 | iex -Version v0.1.2
+iwr -useb https://raw.githubusercontent.com/AcidBurnHen/croner/master/installers/install.ps1 | iex
+```
+
+Or pin a version:
+```powershell
+iwr -useb https://raw.githubusercontent.com/AcidBurnHen/croner/master/installers/install.ps1 | iex -Version v0.1.2
 ```
 
 ---

@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
-set -euo pipefail
+set -eu pipefail
+( set -o pipefail 2>/dev/null ) || true
 
 REPO="AcidBurnHen/croner"
 BIN="croner"
