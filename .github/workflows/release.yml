@@ -7,6 +7,11 @@ on:
 permissions:
   contents: write
 
+env:
+  BIN: croner
+  # If it's a tag, use the tag. Otherwise use a nightly-ish fallback.
+  TAG: ${{ github.ref_type == 'tag' && github.ref_name || format('nightly-{0}', github.run_number) }}
+
 jobs:
   build:
     strategy:
@@ -25,11 +30,9 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             ext: zip
-
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -38,7 +41,7 @@ jobs:
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: sudo apt-get update && sudo apt-get install -y musl-tools
 
-      - name: Ensure packagers are present (Linux)
+      - name: Ensure packagers (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y zip xz-utils
 
@@ -48,22 +51,19 @@ jobs:
       - name: Strip (non-Windows)
         if: runner.os != 'Windows'
         run: |
-          B="target/${{ matrix.target }}/release/croner"
+          B="target/${{ matrix.target }}/release/${{ env.BIN }}"
           command -v strip >/dev/null && strip "$B" || true
 
-      # Package per-OS
       - name: Package (tar.gz on macOS/Linux)
         if: runner.os != 'Windows'
         shell: bash
         run: |
           set -e
-          TAG="${GITHUB_REF#refs/tags/}"
           OUT=dist
           mkdir -p "$OUT"
-          BIN_PATH="target/${{ matrix.target }}/release/croner"
-          NAME="croner-${TAG}-${{ matrix.target }}"
+          BIN_PATH="target/${{ matrix.target }}/release/${{ env.BIN }}"
+          NAME="${{ env.BIN }}-${{ env.TAG }}-${{ matrix.target }}"
           tar -C "$(dirname "$BIN_PATH")" -czf "${OUT}/${NAME}.tar.gz" "$(basename "$BIN_PATH")"
-          # sha256
           if command -v sha256sum >/dev/null; then
             sha256sum "${OUT}/${NAME}.tar.gz" > "${OUT}/${NAME}.tar.gz.sha256"
           else
@@ -74,11 +74,10 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $tag = "${env:GITHUB_REF}" -replace 'refs/tags/',''
           $out = "dist"
           New-Item -ItemType Directory -Force -Path $out | Out-Null
-          $bin = "target/${{ matrix.target }}/release/croner.exe"
-          $name = "croner-$tag-${{ matrix.target }}"
+          $bin = "target/${{ matrix.target }}/release/${{ env.BIN }}.exe"
+          $name = "${{ env.BIN }}-${{ env.TAG }}-${{ matrix.target }}"
           Compress-Archive -Force -Path $bin -DestinationPath "$out\$name.zip"
           (Get-FileHash "$out\$name.zip" -Algorithm SHA256).Hash | Out-File "$out\$name.zip.sha256" -NoNewline
 
