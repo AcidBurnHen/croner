@@ -102,6 +102,20 @@ croner
 ```
 By default it looks for `config.croner` in the current directory.
 
+You can get the full list of options with 
+```bash 
+croner --help 
+# or 
+croner -h
+```
+
+Check version 
+```bash 
+croner --version 
+# or 
+croner -v 
+```
+
 You can specify a different working directory or config file:
 ```bash
 croner --at /path/to/project
@@ -109,6 +123,13 @@ croner --config /path/to/custom_config.croner
 ```
 
 ---
+
+## Uninstallation
+
+To remove the tool simply run the command 
+```bash 
+croner --uninstall 
+```
 
 ## Configuration format
 See [spec.md](spec.md) for the complete format reference.
