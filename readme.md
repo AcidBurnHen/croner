@@ -22,26 +22,54 @@ And it’s **much faster** thanks to Rust’s zero-cost abstractions and optimiz
 
 ## Features
 
-- **Cross-platform** — works the same on Windows and Linux.
+- **Cross-platform** — works the same on Windows, macOS, and Linux.
 - **Fast startup & parsing** — minimal overhead before your jobs run.
-- **Five-field cron expression support** (minute, hour, day, month, weekday) with a small built-in parser.
+- **Five-field cron expression support** (minute, hour, day, month, weekday).
 - **Fanout support** — integer (repeat job N times) or list of arguments.
 - **Hot reload** — automatically reloads config on change.
-- **Minimal config format** — no YAML complexity, optimized for quick parsing with a small built-in parser.
+- **Minimal config format** — no YAML complexity, optimized for quick parsing.
+
+---
 
 ## Installation
 
-### From source
+### 1. Install via prebuilt binaries (recommended)
+
+Precompiled executables are available on the [Releases page](https://github.com/AcidBurnHen/croner/releases/latest).
+
+#### macOS / Linux (curl | sh)
 ```bash
-git clone https://github.com/yourusername/croner.git
+curl -fsSL https://raw.githubusercontent.com/AcidBurnHen/croner/main/installers/install.sh | sh
+# Or pin a version:
+VERSION=v0.1.2 curl -fsSL https://raw.githubusercontent.com/AcidBurnHen/croner/main/installers/install.sh | sh
+```
+
+#### Windows (PowerShell)
+```powershell
+iwr -useb https://raw.githubusercontent.com/AcidBurnHen/croner/main/installers/install.ps1 | iex
+# Or pin a version:
+iwr -useb https://raw.githubusercontent.com/AcidBurnHen/croner/main/installers/install.ps1 | iex -Version v0.1.2
+```
+
+---
+
+### 2. Download manually
+You can manually grab the latest binaries from:
+- **Linux** (musl): [croner-latest-x86_64-unknown-linux-musl.tar.gz](https://github.com/AcidBurnHen/croner/releases/download/v0.1.2/croner-v0.1.2-x86_64-unknown-linux-musl.tar.gz)  
+- **Windows**: [croner-latest-x86_64-pc-windows-msvc.zip](https://github.com/AcidBurnHen/croner/releases/download/v0.1.2/croner-v0.1.2-x86_64-pc-windows-msvc.zip)  
+- **macOS ARM**: [croner-latest-aarch64-apple-darwin.tar.gz](https://github.com/AcidBurnHen/croner/releases/download/v0.1.2/croner-v0.1.2-aarch64-apple-darwin.tar.gz)  
+- **macOS Intel**: [croner-latest-x86_64-apple-darwin.tar.gz](https://github.com/AcidBurnHen/croner/releases/download/v0.1.2/croner-v0.1.2-x86_64-apple-darwin.tar.gz)  
+---
+
+### 3. From source
+```bash
+git clone https://github.com/AcidBurnHen/croner.git
 cd croner
 cargo build --release
 ```
+The binary will be in `target/release/croner`.
 
-This will produce a `croner` binary in `target/release/`.
-
-### (Planned) Prebuilt binaries
-Precompiled executables for major platforms will be available soon.
+---
 
 ## Usage
 
@@ -75,8 +103,12 @@ croner --at /path/to/project
 croner --config /path/to/custom_config.croner
 ```
 
+---
+
 ## Configuration format
 See [spec.md](spec.md) for the complete format reference.
+
+---
 
 ## Example: Fanout in action
 If a job is fanned out, each parallel run gets its own indexed color-coded prefix in the output:
@@ -84,6 +116,8 @@ If a job is fanned out, each parallel run gets its own indexed color-coded prefi
 [job1#1] ...
 [job1#2] ...
 ```
+
+---
 
 ## Credits
 
