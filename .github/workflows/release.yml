@@ -1,0 +1,82 @@
+name: release
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            ext: tar.gz
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            ext: tar.gz
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            ext: tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            ext: zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install musl tools (Linux only)
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Strip (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          BIN=croner
+          B="target/${{ matrix.target }}/release/$BIN"
+          command -v strip >/dev/null && strip "$B" || true
+
+      - name: Package
+        shell: bash
+        run: |
+          set -e
+          BIN=croner
+          TAG="${GITHUB_REF#refs/tags/}"
+          OUT=dist
+          mkdir -p "$OUT"
+
+          case "${{ matrix.target }}" in
+            *windows*) BINARY="target/${{ matrix.target }}/release/${BIN}.exe" ;;
+            *)          BINARY="target/${{ matrix.target }}/release/${BIN}"     ;;
+          esac
+
+          NAME="${BIN}-${TAG}-${{ matrix.target }}"
+          case "${{ matrix.ext }}" in
+            tar.gz)
+              tar -C "$(dirname "$BINARY")" -czf "${OUT}/${NAME}.tar.gz" "$(basename "$BINARY")"
+              ;;
+            zip)
+              (cd "$(dirname "$BINARY")" && zip -9 "../../${OUT}/${NAME}.zip" "$(basename "$BINARY")")
+              ;;
+          esac
+
+      - name: Checksums
+        if: runner.os == 'Linux'
+        run: |
+          cd dist
+          sha256sum * > SHA256SUMS
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
