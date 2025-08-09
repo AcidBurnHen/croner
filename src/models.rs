@@ -9,58 +9,77 @@ pub struct JobInstance {
     pub command: Vec<OsString>,
 }
 
+/// Fanout is prepared for runtime:
+/// - None: single run with base_cmd
+/// - Int(n): run n times with base_cmd
+/// - List(cmds): each entry is a full prebuilt command (base + extras)
 #[derive(Debug, Clone)]
 pub enum Fanout {
+    None,
     Int(usize),
-    List(Vec<String>),
+    List(Vec<Vec<OsString>>),
 }
 
 #[derive(Debug, Clone)]
 pub struct JobSpec {
     pub id: String,
     pub schedule: CronSchedule,
-    pub command: String,
-    pub fanout: Option<Fanout>,
+
+    /// Pre-parsed base command tokens
+    pub base_cmd: Vec<OsString>,
+
+    /// Prepared fanout plan.
+    pub fanout: Fanout,
 }
 
 impl JobSpec {
+    /// Expand into concrete instances with already prepared argv vectors.
     pub fn expand(&self) -> Vec<JobInstance> {
         match &self.fanout {
-            None => {
-                let cmd = get_command_as_os_str(&self.command);
-
+            Fanout::None => {
                 vec![JobInstance {
                     id: self.id.clone(),
-                    command: cmd,
+                    command: self.base_cmd.clone(),
                 }]
             }
-
-            Some(Fanout::List(list)) => list
-                .iter()
-                .enumerate()
-                .map(|(i, args)| {
-                    let mut combined = String::with_capacity(self.command.len() + 1 + args.len());
-                    combined.push_str(&self.command);
-                    combined.push(' ');
-                    combined.push_str(args);
-
-                    let cmd = get_command_as_os_str(&combined);
-                    JobInstance {
+            Fanout::Int(n) => {
+                let mut out = Vec::with_capacity(*n);
+                for i in 0..*n {
+                    out.push(JobInstance {
                         id: format!("{}-{}", self.id, i),
-                        command: cmd,
-                    }
-                })
-                .collect(),
-
-            Some(Fanout::Int(n)) => {
-                let cmd = get_command_as_os_str(&self.command);
-                (0..*n)
-                    .map(|i| JobInstance {
+                        command: self.base_cmd.clone(),
+                    });
+                }
+                out
+            }
+            Fanout::List(cmds) => {
+                let mut out = Vec::with_capacity(cmds.len());
+                for (i, argv) in cmds.iter().enumerate() {
+                    out.push(JobInstance {
                         id: format!("{}-{}", self.id, i),
-                        command: cmd.clone(),
-                    })
-                    .collect()
+                        command: argv.clone(),
+                    });
+                }
+                out
             }
         }
+    }
+
+    /// Helper used by loader to build list fanouts efficiently (base + extra args).
+    pub fn build_fanout_list_from_strings(
+        base_cmd: &[OsString],
+        extras: &[String],
+    ) -> Vec<Vec<OsString>> {
+        let mut out = Vec::with_capacity(extras.len());
+        for e in extras {
+            let extra_tokens = get_command_as_os_str(e);
+            let mut combined = Vec::with_capacity(base_cmd.len() + extra_tokens.len());
+
+            combined.extend(base_cmd.iter().cloned());
+            combined.extend(extra_tokens);
+            out.push(combined);
+        }
+
+        out
     }
 }

@@ -1,12 +1,11 @@
-// ===== src/loader.rs =====
-
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use std::time::SystemTime;
 
 use crate::models::{Fanout, JobSpec};
-use crate::parser::{CronParser, CronSchedule};
+use crate::parser::CronParser;
+use crate::shell::get_command_as_os_str;
 
 pub struct ConfigCache {
     pub jobs: Vec<JobSpec>,
@@ -49,8 +48,8 @@ impl ConfigCache {
     }
 }
 
-// State for the current section
-struct Building<'a> {
+// State for the current [job:<id>] section while parsing
+struct JobBuilder<'a> {
     id: &'a str,
     schedule: Option<&'a str>,
     command: Option<&'a str>,
@@ -72,10 +71,9 @@ pub fn load_config(path: &Path) -> Result<Vec<JobSpec>, String> {
 
     let mut jobs: Vec<JobSpec> = Vec::new();
     let mut seen_ids: HashSet<String> = HashSet::new();
-    let mut cur: Option<Building> = None;
+    let mut cur: Option<JobBuilder> = None;
     let mut cron = CronParser::new();
 
-    // Manual scan: split by '\n', tolerate '\r\n', strip comments, trim ASCII
     let data = text.as_bytes();
     let n = data.len();
     let mut i = 0usize;
@@ -89,26 +87,23 @@ pub fn load_config(path: &Path) -> Result<Vec<JobSpec>, String> {
     while i < n {
         lineno += 1;
 
-        // Find end of line
         let line_start = i;
         while i < n && data[i] != b'\n' {
             i += 1;
         }
         let mut line_end = i;
 
-        // Consume '\n'
         if i < n && data[i] == b'\n' {
             i += 1;
         }
 
-        // Drop trailing '\r'
         if line_end > line_start && data[line_end - 1] == b'\r' {
             line_end -= 1;
         }
 
         let mut line = &data[line_start..line_end];
 
-        // Strip comment (# to end)
+        // Strip comment
         if let Some(hash) = memchr(line, b'#') {
             line = &line[..hash];
         }
@@ -130,11 +125,10 @@ pub fn load_config(path: &Path) -> Result<Vec<JobSpec>, String> {
                 if !seen_ids.insert(job.id.clone()) {
                     return Err(format!("duplicate job id '{}'", job.id));
                 }
-
                 jobs.push(job);
             }
 
-            cur = Some(Building {
+            cur = Some(JobBuilder {
                 id: id_slice,
                 schedule: None,
                 command: None,
@@ -248,6 +242,50 @@ pub fn load_config(path: &Path) -> Result<Vec<JobSpec>, String> {
     Ok(jobs)
 }
 
+fn finalize_job<'a>(cron: &mut CronParser, b: JobBuilder<'a>) -> Result<JobSpec, String> {
+    let id = b.id.trim();
+    if id.is_empty() {
+        return Err("empty job id".into());
+    }
+
+    let schedule_str = match b.schedule {
+        Some(s) => s,
+        None => return Err(format!("job '{}': missing schedule", id)),
+    };
+
+    let schedule = match cron.parse(schedule_str) {
+        Ok(s) => s,
+        Err(e) => return Err(format!("job '{}': invalid schedule: {}", id, e)),
+    };
+
+    let command_str = match b.command {
+        Some(c) => c,
+        None => return Err(format!("job '{}': missing command", id)),
+    };
+
+    // Pre-parse base command once
+    let base_cmd = get_command_as_os_str(command_str);
+
+    // Build fanout plan
+    let fanout = if let Some(n) = b.fanout_int {
+        Fanout::Int(n)
+    } else if !b.fanout_list.is_empty() {
+        // Prepare full argv per fanout entry: base_cmd + parsed extras
+        let extras: Vec<String> = b.fanout_list.into_iter().map(|s| s.to_string()).collect();
+        let list = crate::models::JobSpec::build_fanout_list_from_strings(&base_cmd, &extras);
+        Fanout::List(list)
+    } else {
+        Fanout::None
+    };
+
+    Ok(JobSpec {
+        id: id.to_string(),
+        schedule,
+        base_cmd,
+        fanout,
+    })
+}
+
 #[inline]
 fn trim_ascii(mut s: &[u8]) -> &[u8] {
     while let Some(&b) = s.first() {
@@ -256,14 +294,12 @@ fn trim_ascii(mut s: &[u8]) -> &[u8] {
         }
         s = &s[1..];
     }
-
     while let Some(&b) = s.last() {
         if !is_ascii_ws(b) {
             break;
         }
         s = &s[..s.len() - 1];
     }
-
     s
 }
 
@@ -284,71 +320,6 @@ fn parse_section_header(line: &[u8]) -> Option<&str> {
         return std::str::from_utf8(id_bytes).ok();
     }
     None
-}
-
-// Convenience to pass Building by-value into finalize without cloning slices
-struct BuildingBorrow<'a> {
-    id: &'a str,
-    schedule: Option<&'a str>,
-    command: Option<&'a str>,
-    fanout_int: Option<usize>,
-    fanout_list: Vec<&'a str>,
-}
-
-impl<'a> From<Building<'a>> for BuildingBorrow<'a> {
-    fn from(b: Building<'a>) -> Self {
-        BuildingBorrow {
-            id: b.id,
-            schedule: b.schedule,
-            command: b.command,
-            fanout_int: b.fanout_int,
-            fanout_list: b.fanout_list,
-        }
-    }
-}
-
-fn finalize_job<'a>(
-    cron: &mut CronParser,
-    b: impl Into<BuildingBorrow<'a>>,
-) -> Result<JobSpec, String> {
-    let b = b.into();
-
-    let id = b.id.trim();
-    if id.is_empty() {
-        return Err("empty job id".into());
-    }
-
-    let schedule_str = match b.schedule {
-        Some(s) => s,
-        None => return Err(format!("job '{}': missing schedule", id)),
-    };
-
-    let schedule = match cron.parse(schedule_str) {
-        Ok(s) => s,
-        Err(e) => return Err(format!("job '{}': invalid schedule: {}", id, e)),
-    };
-
-    let command = match b.command {
-        Some(c) => c.to_string(),
-        None => return Err(format!("job '{}': missing command", id)),
-    };
-
-    let fanout = if let Some(n) = b.fanout_int {
-        Some(Fanout::Int(n))
-    } else if !b.fanout_list.is_empty() {
-        Some(Fanout::List(
-            b.fanout_list.into_iter().map(|s| s.to_string()).collect(),
-        ))
-    } else {
-        None
-    };
-
-    Ok(JobSpec {
-        id: id.to_string(),
-        schedule,
-        command,
-        fanout,
-    })
 }
 
 #[inline]
