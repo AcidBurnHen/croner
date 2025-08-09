@@ -92,10 +92,24 @@ impl Scheduler {
         let color_code = self.colors.get(hash_id(&job.id));
 
         for instance in instances {
-            let mut cmd = Command::new(&instance.command[0]);
-            for arg in &instance.command[1..] {
-                cmd.arg(arg);
-            }
+            // Join all parts of the command into a single string
+            let full_cmd = instance
+                .command
+                .iter()
+                .map(|s| s.to_string_lossy())
+                .collect::<Vec<_>>()
+                .join(" ");
+
+            #[cfg(unix)]
+            let mut cmd = Command::new("sh");
+            #[cfg(unix)]
+            cmd.arg("-c").arg(&full_cmd);
+
+            #[cfg(windows)]
+            let mut cmd = Command::new("cmd");
+            #[cfg(windows)]
+            cmd.arg("/C").arg(&full_cmd);
+
             cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
             let job_id = instance.id.clone();
@@ -152,8 +166,8 @@ pub fn compute_next_run(schedule: &CronSchedule) -> Instant {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default();
 
-    let mut secs = now.as_secs();
-    let mut minutes = secs / 60;
+    let secs = now.as_secs();
+    let minutes = secs / 60;
     let mut next_minutes = minutes + 1;
 
     loop {

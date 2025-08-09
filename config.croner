@@ -1,0 +1,5 @@
+[job:job1]
+schedule = * * * * *         # Every minute
+command = "echo Hello from job1 , with changes"
+fanout = ["one", "two"]
+

@@ -1,5 +1,3 @@
-// ===== tests/loader_tests.rs =====
-
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -42,8 +40,7 @@ fanout = 4
 [job:daily_etl]
 schedule = 0 2 * * *
 command = python etl.py
-fanout[] = --source=internal --mode=full
-fanout[] = --source=external --mode=delta
+fanout = ["--source=internal --mode=full", "--source=external --mode=delta"]
 
 [job:ping]
 schedule = * * * * *
@@ -54,24 +51,31 @@ command = python ping.py
     let jobs = load_config(&p).expect("should parse");
     assert_eq!(jobs.len(), 3);
 
-    let j0 = &jobs[0];
-    assert_eq!(j0.id, "index_articles");
-    match j0.fanout {
+    // Job 0: int fanout
+    assert_eq!(jobs[0].id, "index_articles");
+    match jobs[0].fanout {
         Fanout::Int(4) => {}
         _ => panic!("expected Fanout::Int(4)"),
     }
 
-    let j1 = &jobs[1];
-    match j1.fanout {
+    // Job 1: list fanout
+    match jobs[1].fanout {
         Fanout::List(ref v) => {
-            // Don’t assume internal argv structure; just ensure two entries exist.
             assert_eq!(v.len(), 2, "expected two fanout entries");
+            assert!(v.iter().any(|args| {
+                args.iter()
+                    .any(|a| a.to_string_lossy().contains("--source=internal"))
+            }));
+            assert!(v.iter().any(|args| {
+                args.iter()
+                    .any(|a| a.to_string_lossy().contains("--source=external"))
+            }));
         }
         _ => panic!("expected Fanout::List"),
     }
 
-    let j2 = &jobs[2];
-    match j2.fanout {
+    // Job 2: no fanout
+    match jobs[2].fanout {
         Fanout::None => {}
         _ => panic!("expected Fanout::None"),
     }
@@ -171,7 +175,7 @@ schedule = * * * * *
 }
 
 #[test]
-fn error_on_fanout_conflict_and_non_int() {
+fn error_on_duplicate_fanout_key() {
     let p = temp_path("fanout_conflict.croner");
     write(
         &p,
@@ -180,12 +184,16 @@ fn error_on_fanout_conflict_and_non_int() {
 schedule = * * * * *
 command = echo hi
 fanout = 2
-fanout[] = --x
+fanout = ["--x"]
 "#,
     );
     let err = load_config(&p).unwrap_err();
-    assert!(err.to_lowercase().contains("conflicts"));
+    assert!(err.to_lowercase().contains("duplicate `fanout`"));
+}
 
+#[test]
+fn error_on_fanout_non_int() {
+    let p = temp_path("fanout_nonint.croner");
     write(
         &p,
         r#"
@@ -196,7 +204,9 @@ fanout = nope
 "#,
     );
     let err = load_config(&p).unwrap_err();
-    assert!(err.to_lowercase().contains("fanout must be an integer"));
+    assert!(err
+        .to_lowercase()
+        .contains("fanout must be an integer or list"));
 }
 
 #[test]
@@ -255,7 +265,6 @@ schedule = * * * * *
     );
     let res = cache.reload_if_changed(&p);
     assert!(res.is_err(), "should error on invalid config");
-    // cache remains with old good jobs
     assert_eq!(cache.jobs.len(), 1);
     assert_eq!(cache.jobs[0].id, "a");
 

@@ -54,7 +54,7 @@ struct JobBuilder<'a> {
     schedule: Option<&'a str>,
     command: Option<&'a str>,
     fanout_int: Option<usize>,
-    fanout_list: Vec<&'a str>,
+    fanout_list: Vec<String>,
     first_line: usize,
 }
 
@@ -158,25 +158,31 @@ pub fn load_config(path: &Path) -> Result<Vec<JobSpec>, String> {
                 if b.schedule.is_some() {
                     return Err(format!("line {}: duplicate `schedule`", lineno));
                 }
+
                 let v = trim_ascii(value);
                 let s = match std::str::from_utf8(v) {
                     Ok(s) => s,
                     Err(_) => return Err(format!("line {}: invalid UTF-8 in schedule", lineno)),
                 };
+
                 b.schedule = Some(s);
             }
             b"command" => {
                 if b.command.is_some() {
                     return Err(format!("line {}: duplicate `command`", lineno));
                 }
+
                 let v = trim_ascii(value);
+
                 if v.is_empty() {
                     return Err(format!("line {}: command cannot be empty", lineno));
                 }
+
                 let s = match std::str::from_utf8(v) {
                     Ok(s) => s,
                     Err(_) => return Err(format!("line {}: invalid UTF-8 in command", lineno)),
                 };
+
                 b.command = Some(s);
             }
             b"fanout" => {
@@ -189,32 +195,32 @@ pub fn load_config(path: &Path) -> Result<Vec<JobSpec>, String> {
                 if b.fanout_int.is_some() {
                     return Err(format!("line {}: duplicate `fanout`", lineno));
                 }
+
                 let s = match std::str::from_utf8(trim_ascii(value)) {
                     Ok(s) => s,
                     Err(_) => return Err(format!("line {}: invalid UTF-8 in fanout", lineno)),
                 };
-                let n: usize = match s.parse() {
-                    Ok(n) => n,
-                    Err(_) => return Err(format!("line {}: fanout must be an integer", lineno)),
-                };
-                b.fanout_int = Some(n);
-            }
-            b"fanout[]" => {
-                if b.fanout_int.is_some() {
-                    return Err(format!(
-                        "line {}: `fanout[]` conflicts with `fanout`",
-                        lineno
-                    ));
+
+                let s_trim = s.trim();
+                if s_trim.starts_with('[') && s_trim.ends_with(']') {
+                    // New list syntax: fanout = [ ... ]
+                    let inner = &s_trim[1..s_trim.len() - 1];
+                    let items =
+                        parse_list_items(inner).map_err(|e| format!("line {}: {}", lineno, e))?;
+                    b.fanout_list.extend(items);
+                } else {
+                    // Fallback: old single integer syntax
+                    let n: usize = match s_trim.parse() {
+                        Ok(n) => n,
+                        Err(_) => {
+                            return Err(format!(
+                                "line {}: fanout must be an integer or list",
+                                lineno
+                            ))
+                        }
+                    };
+                    b.fanout_int = Some(n);
                 }
-                let v = trim_ascii(value);
-                if v.is_empty() {
-                    return Err(format!("line {}: fanout[] value cannot be empty", lineno));
-                }
-                let s = match std::str::from_utf8(v) {
-                    Ok(s) => s,
-                    Err(_) => return Err(format!("line {}: invalid UTF-8 in fanout[]", lineno)),
-                };
-                b.fanout_list.push(s);
             }
             _ => {
                 return Err(format!(
@@ -240,6 +246,45 @@ pub fn load_config(path: &Path) -> Result<Vec<JobSpec>, String> {
     }
 
     Ok(jobs)
+}
+
+/// Parses a list like: [1, 2, "some value", "--help"]
+/// Supports quoted strings with spaces and escaping inside quotes.
+fn parse_list_items(input: &str) -> Result<Vec<String>, String> {
+    let mut items = Vec::new();
+    let mut buf = String::new();
+    let mut in_quotes = false;
+    let mut escape = false;
+
+    for c in input.chars() {
+        if escape {
+            buf.push(c);
+            escape = false;
+        } else if c == '\\' {
+            escape = true;
+        } else if c == '"' {
+            in_quotes = !in_quotes;
+        } else if c == ',' && !in_quotes {
+            let item = buf.trim();
+            if !item.is_empty() {
+                items.push(item.to_string());
+            }
+            buf.clear();
+        } else {
+            buf.push(c);
+        }
+    }
+
+    if in_quotes {
+        return Err("unterminated quote in list".into());
+    }
+
+    let item = buf.trim();
+    if !item.is_empty() {
+        items.push(item.to_string());
+    }
+
+    Ok(items)
 }
 
 fn finalize_job<'a>(cron: &mut CronParser, b: JobBuilder<'a>) -> Result<JobSpec, String> {

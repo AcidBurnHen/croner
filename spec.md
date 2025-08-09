@@ -2,15 +2,15 @@
 
 ## Overview
 
-`croner` is a high-performance cron-like job runner written in Rust, evolved from the Python-based [PyCroner](https://github.com/AcidBurnHen/pycroner) project.\
-While PyCroner used YAML for configuration, Croner is designed for **speed, stability, and local-first execution**.\
+`croner` is a high-performance cron-like job runner written in Rust, evolved from the Python-based [PyCroner](https://github.com/AcidBurnHen/pycroner) project.  
+While PyCroner used YAML for configuration, Croner is designed for **speed, stability, and local-first execution**.  
 To meet these goals, we’ve **ditched YAML** in favor of a minimal, line-based configuration format optimized for quick parsing and atomic reloads.
 
 ## File Name
 
 - Default: `config.croner`
 - Override via CLI:
-  ```
+  ```bash
   croner --config=/path/to/my_config.croner
   ```
 
@@ -23,7 +23,7 @@ To meet these goals, we’ve **ditched YAML** in favor of a minimal, line-based 
 
 Example:
 
-```
+```ini
 [job:my_first_job]
 schedule = */5 * * * *
 command = echo "Hello World"
@@ -36,8 +36,7 @@ fanout = 4
 [job:multi_target_sync]
 schedule = 15 3 * * *
 command = python sync.py
-fanout[] = --env=prod --sync=full
-fanout[] = --env=dev --sync=partial
+fanout = ["--env=prod --sync=full", "--env=dev --sync=partial"]
 ```
 
 ---
@@ -74,20 +73,20 @@ fanout[] = --env=dev --sync=partial
 
 ### `fanout`
 
-- **Type**: Integer or multiple `fanout[]` lines.
+- **Type**: Integer or List.
 - **Required**: No.
 - **Behavior**:
   - **Integer**: Run the same command N times in parallel.
-  - ``** list**: Append each string to the base command and run separately.
+  - **List**: Append each string to the base command and run separately.
 
 #### Fanout as Integer
 
-```
+```ini
 fanout = 3
 ```
 
 - Runs:
-  ```
+  ```bash
   echo "Hello World"
   echo "Hello World"
   echo "Hello World"
@@ -95,13 +94,12 @@ fanout = 3
 
 #### Fanout as List
 
-```
-fanout[] = --env=prod --sync=full
-fanout[] = --env=dev --sync=partial
+```ini
+fanout = ["--env=prod --sync=full", "--env=dev --sync=partial"]
 ```
 
 - Runs:
-  ```
+  ```bash
   python sync.py --env=prod --sync=full
   python sync.py --env=dev --sync=partial
   ```
@@ -110,7 +108,7 @@ fanout[] = --env=dev --sync=partial
 
 ## Example `config.croner`
 
-```
+```ini
 [job:index_articles]
 schedule = */15 * * * *
 command = python index.py
@@ -119,8 +117,7 @@ fanout = 4
 [job:daily_etl]
 schedule = 0 2 * * *
 command = python etl.py
-fanout[] = --source=internal --mode=full
-fanout[] = --source=external --mode=delta
+fanout = ["--source=internal --mode=full", "--source=external --mode=delta"]
 
 [job:ping]
 schedule = * * * * *
