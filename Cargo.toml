@@ -2,7 +2,21 @@
 name = "croner"
 version = "0.1.0"
 edition = "2021"
+authors = ["Marin Luic <your@email.com>"]
+description = "A fast, local-first cron-like job runner with a minimal config format."
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/AcidBurnHen/croner"
+repository = "https://github.com/AcidBurnHen/croner"
+keywords = ["cron", "scheduler", "cli", "jobs"]
+categories = ["command-line-utilities", "development-tools"]
+rust-version = "1.74"
+exclude = [".github/*", "scripts/*"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "croner"
+path = "src/lib.rs"
 
-[dependencies]
+[[bin]]
+name = "croner"
+path = "src/main.rs"
