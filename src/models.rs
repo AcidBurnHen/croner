@@ -1,5 +1,4 @@
 use std::ffi::OsString;
-use std::fmt::format;
 
 use crate::parser::CronSchedule;
 use crate::shell::get_command_as_os_str;
