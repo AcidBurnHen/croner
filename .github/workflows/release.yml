@@ -1,9 +1,8 @@
 name: release
 on:
   push:
-    tags:
-      - 'v*.*.*'
-    workflow_dispatch: {} 
+    tags: ['v*.*.*']
+  workflow_dispatch: {}
 
 permissions:
   contents: write
@@ -26,6 +25,7 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             ext: zip
+
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -38,45 +38,49 @@ jobs:
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: sudo apt-get update && sudo apt-get install -y musl-tools
 
+      - name: Ensure packagers are present (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y zip xz-utils
+
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Strip (Linux/macOS)
+      - name: Strip (non-Windows)
         if: runner.os != 'Windows'
         run: |
-          BIN=croner
-          B="target/${{ matrix.target }}/release/$BIN"
+          B="target/${{ matrix.target }}/release/croner"
           command -v strip >/dev/null && strip "$B" || true
 
-      - name: Package
+      # Package per-OS
+      - name: Package (tar.gz on macOS/Linux)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           set -e
-          BIN=croner
           TAG="${GITHUB_REF#refs/tags/}"
           OUT=dist
           mkdir -p "$OUT"
+          BIN_PATH="target/${{ matrix.target }}/release/croner"
+          NAME="croner-${TAG}-${{ matrix.target }}"
+          tar -C "$(dirname "$BIN_PATH")" -czf "${OUT}/${NAME}.tar.gz" "$(basename "$BIN_PATH")"
+          # sha256
+          if command -v sha256sum >/dev/null; then
+            sha256sum "${OUT}/${NAME}.tar.gz" > "${OUT}/${NAME}.tar.gz.sha256"
+          else
+            shasum -a 256 "${OUT}/${NAME}.tar.gz" | awk '{print $1}' > "${OUT}/${NAME}.tar.gz.sha256"
+          fi
 
-          case "${{ matrix.target }}" in
-            *windows*) BINARY="target/${{ matrix.target }}/release/${BIN}.exe" ;;
-            *)          BINARY="target/${{ matrix.target }}/release/${BIN}"     ;;
-          esac
-
-          NAME="${BIN}-${TAG}-${{ matrix.target }}"
-          case "${{ matrix.ext }}" in
-            tar.gz)
-              tar -C "$(dirname "$BINARY")" -czf "${OUT}/${NAME}.tar.gz" "$(basename "$BINARY")"
-              ;;
-            zip)
-              (cd "$(dirname "$BINARY")" && zip -9 "../../${OUT}/${NAME}.zip" "$(basename "$BINARY")")
-              ;;
-          esac
-
-      - name: Checksums
-        if: runner.os == 'Linux'
+      - name: Package (zip on Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
         run: |
-          cd dist
-          sha256sum * > SHA256SUMS
+          $tag = "${env:GITHUB_REF}" -replace 'refs/tags/',''
+          $out = "dist"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          $bin = "target/${{ matrix.target }}/release/croner.exe"
+          $name = "croner-$tag-${{ matrix.target }}"
+          Compress-Archive -Force -Path $bin -DestinationPath "$out\$name.zip"
+          (Get-FileHash "$out\$name.zip" -Algorithm SHA256).Hash | Out-File "$out\$name.zip.sha256" -NoNewline
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
