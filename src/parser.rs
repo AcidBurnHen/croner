@@ -1,10 +1,18 @@
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct CronSchedule {
+    // Bitmasks (original behavior preserved)
     pub minute: u64, // bits 0..59
     pub hour: u32,   // bits 0..23
     pub day: u32,    // bits 1..31 (bit 0 unused)
     pub month: u16,  // bits 1..12 (bit 0 unused)
     pub weekday: u8, // bits 0..6
+
+    // Precomputed sorted allowed values for fast "next" computations
+    pub minutes: Vec<u8>,  // 0..59
+    pub hours: Vec<u8>,    // 0..23
+    pub days: Vec<u8>,     // 1..31
+    pub months: Vec<u8>,   // 1..12
+    pub weekdays: Vec<u8>, // 0..6
 }
 
 pub struct CronParser {
@@ -37,12 +45,30 @@ impl CronParser {
         let [minute_str, hour_str, day_str, month_str, weekday_str]: [&str; 5] =
             parts.try_into().unwrap();
 
+        let minute_mask = self.parse_field(minute_str, self.field_ranges[0])?;
+        let hour_mask = self.parse_field(hour_str, self.field_ranges[1])? as u32;
+        let day_mask = self.parse_field(day_str, self.field_ranges[2])? as u32;
+        let month_mask = self.parse_field(month_str, self.field_ranges[3])? as u16;
+        let weekday_mask = self.parse_field(weekday_str, self.field_ranges[4])? as u8;
+
+        // Precompute sorted lists from masks (done once at load time)
+        let minutes = mask_to_list_u64(minute_mask, 0, 59);
+        let hours = mask_to_list_u32(hour_mask, 0, 23);
+        let days = mask_to_list_u32(day_mask, 1, 31);
+        let months = mask_to_list_u16(month_mask, 1, 12);
+        let weekdays = mask_to_list_u8(weekday_mask, 0, 6);
+
         Ok(CronSchedule {
-            minute: self.parse_field(minute_str, self.field_ranges[0])?,
-            hour: self.parse_field(hour_str, self.field_ranges[1])? as u32,
-            day: self.parse_field(day_str, self.field_ranges[2])? as u32,
-            month: self.parse_field(month_str, self.field_ranges[3])? as u16,
-            weekday: self.parse_field(weekday_str, self.field_ranges[4])? as u8,
+            minute: minute_mask,
+            hour: hour_mask,
+            day: day_mask,
+            month: month_mask,
+            weekday: weekday_mask,
+            minutes,
+            hours,
+            days,
+            months,
+            weekdays,
         })
     }
 
@@ -68,10 +94,16 @@ impl CronParser {
                 }
             } else if let Some(step_str) = expr_part.strip_prefix("*/") {
                 let step = self.parse_u8(step_str, &format!("Invalid step: {}", expr_part))?;
+                if step == 0 {
+                    return Err(format!("Invalid step: {}", expr_part));
+                }
                 let mut v = start;
                 while v <= end {
                     Self::set_bit(&mut mask, v);
-                    v += step;
+                    match v.checked_add(step) {
+                        Some(next) => v = next,
+                        None => break,
+                    }
                 }
             } else if expr_part.contains('-') {
                 let parts: Vec<&str> = expr_part.split('-').collect();
@@ -100,4 +132,45 @@ impl CronParser {
 
         Ok(mask)
     }
+}
+
+#[inline]
+fn mask_to_list_u64(mask: u64, start: u8, end: u8) -> Vec<u8> {
+    let mut out = Vec::new();
+    for v in start..=end {
+        if (mask >> v) & 1 == 1 {
+            out.push(v);
+        }
+    }
+    out
+}
+#[inline]
+fn mask_to_list_u32(mask: u32, start: u8, end: u8) -> Vec<u8> {
+    let mut out = Vec::new();
+    for v in start..=end {
+        if (mask >> v) & 1 == 1 {
+            out.push(v);
+        }
+    }
+    out
+}
+#[inline]
+fn mask_to_list_u16(mask: u16, start: u8, end: u8) -> Vec<u8> {
+    let mut out = Vec::new();
+    for v in start..=end {
+        if (mask >> v) & 1 == 1 {
+            out.push(v);
+        }
+    }
+    out
+}
+#[inline]
+fn mask_to_list_u8(mask: u8, start: u8, end: u8) -> Vec<u8> {
+    let mut out = Vec::new();
+    for v in start..=end {
+        if (mask >> v) & 1 == 1 {
+            out.push(v);
+        }
+    }
+    out
 }
