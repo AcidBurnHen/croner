@@ -1,5 +1,4 @@
-use std::env;
-use std::path::PathBuf;
+use std::{env, fs, path::PathBuf};
 
 use croner::loader::ConfigCache;
 use croner::printer::Printer;
@@ -16,34 +15,11 @@ fn main() {
                 return;
             }
             "--help" | "-h" => {
-                println!(
-                    "\x1b[1;36m{}\x1b[0m - A high-performance cron-style job runner
-
-\x1b[1mUSAGE:\x1b[0m
-    \x1b[32mcroner\x1b[0m [OPTIONS]
-
-\x1b[1mOPTIONS:\x1b[0m
-    \x1b[33m--config=<path>\x1b[0m    Path to config file (default: ./config.croner)
-    \x1b[33m--print=<bool>\x1b[0m     Enable/disable printing job output (default: true)
-    \x1b[33m--version, -v\x1b[0m      Show version and exit
-    \x1b[33m--help, -h\x1b[0m         Show this help message and exit
-
-\x1b[1mEXAMPLES:\x1b[0m
-    croner
-    croner --config=/etc/croner/jobs.croner
-    croner --print=false
-    croner --version
-",
-                    r#"
-   ______                          
-  / ____/________  ____  ___  _____
- / /   / ___/ __ \/ __ \/ _ \/ ___/
-/ /___/ /  / /_/ / / / /  __/ /    
-\____/_/   \____/_/ /_/\___/_/     
-                                   
-                                   
-"#,
-                );
+                print_help();
+                return;
+            }
+            "--uninstall" => {
+                uninstall();
                 return;
             }
             _ => {
@@ -67,4 +43,105 @@ fn main() {
 
     scheduler.init();
     scheduler.run(&config_path);
+}
+
+fn print_help() {
+    println!(
+        "\x1b[1;36m{}\x1b[0m - A high-performance cron-style job runner
+
+\x1b[1mUSAGE:\x1b[0m
+    \x1b[32mcroner\x1b[0m [OPTIONS]
+
+\x1b[1mOPTIONS:\x1b[0m
+    \x1b[33m--config=<path>\x1b[0m    Path to config file (default: ./config.croner)
+    \x1b[33m--print=<bool>\x1b[0m     Enable/disable printing job output (default: true)
+    \x1b[33m--version, -v\x1b[0m      Show version and exit
+    \x1b[33m--help, -h\x1b[0m         Show this help message and exit
+    \x1b[33m--uninstall\x1b[0m        Remove Croner from system
+
+\x1b[1mEXAMPLES:\x1b[0m
+    croner
+    croner --config=/etc/croner/jobs.croner
+    croner --print=false
+    croner --version
+    croner --uninstall
+",
+        r#"
+   ______                          
+  / ____/________  ____  ___  _____
+ / /   / ___/ __ \/ __ \/ _ \/ ___/
+/ /___/ /  / /_/ / / / /  __/ /    
+\____/_/   \____/_/ /_/\___/_/     
+                                   
+                                   
+"#
+    );
+}
+
+#[inline]
+fn home_dir() -> Option<PathBuf> {
+    if let Ok(home) = env::var("HOME") {
+        return Some(PathBuf::from(home));
+    }
+    if let Ok(profile) = env::var("USERPROFILE") {
+        return Some(PathBuf::from(profile));
+    }
+    None
+}
+
+fn uninstall() {
+    #[cfg(target_os = "windows")]
+    {
+        let possible_paths = vec![
+            PathBuf::from(r"C:\Program Files\croner\croner.exe"),
+            home_dir()
+                .map(|h| h.join(r"AppData\Local\Programs\croner\croner.exe"))
+                .unwrap_or_default(),
+        ];
+
+        let mut removed_any = false;
+        for path in possible_paths {
+            if path.exists() {
+                match fs::remove_file(&path) {
+                    Ok(_) => {
+                        println!("Removed {}", path.display());
+                        removed_any = true;
+                    }
+                    Err(e) => eprintln!("Failed to remove {}: {}", path.display(), e),
+                }
+            }
+        }
+
+        if !removed_any {
+            println!("Failed to remove the croner binary.");
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let possible_paths = vec![
+            PathBuf::from("/usr/local/bin/croner"),
+            PathBuf::from("/usr/bin/croner"),
+            home_dir()
+                .map(|h| h.join(".local/bin/croner"))
+                .unwrap_or_default(),
+        ];
+
+        let mut removed_any = false;
+        for path in possible_paths {
+            if path.exists() {
+                match fs::remove_file(&path) {
+                    Ok(_) => {
+                        println!("Removed {}", path.display());
+                        removed_any = true;
+                    }
+                    Err(e) => eprintln!("Failed to remove {}: {}", path.display(), e),
+                }
+            }
+        }
+
+        if !removed_any {
+            println!("Failed to remove the croner binary.");
+        }
+    }
 }
