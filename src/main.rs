@@ -1,4 +1,4 @@
-use std::{env, fs, path::PathBuf};
+use std::{env, fs, io, path::PathBuf};
 
 use croner::loader::ConfigCache;
 use croner::printer::Printer;
@@ -89,7 +89,25 @@ fn home_dir() -> Option<PathBuf> {
     None
 }
 
+fn confirm_uninstall() -> bool {
+    println!("\x1b[31;1m⚠ WARNING:\x1b[0m This will remove Croner from your system.");
+    print!("Are you sure? (y/N): ");
+    io::Write::flush(&mut io::stdout()).unwrap();
+
+    let mut input = String::new();
+    if io::stdin().read_line(&mut input).is_ok() {
+        let ans = input.trim().to_lowercase();
+        return ans == "y" || ans == "yes";
+    }
+    false
+}
+
 fn uninstall() {
+    if !confirm_uninstall() {
+        println!("Uninstall cancelled.");
+        return;
+    }
+
     #[cfg(target_os = "windows")]
     {
         let possible_paths = vec![
@@ -113,7 +131,7 @@ fn uninstall() {
         }
 
         if !removed_any {
-            println!("Failed to remove the croner binary.");
+            println!("Croner binary failed to be removed or not found");
         }
     }
 
@@ -141,7 +159,7 @@ fn uninstall() {
         }
 
         if !removed_any {
-            println!("Failed to remove the croner binary.");
+            println!("Croner binary failed to be removed or not found");
         }
     }
 }
