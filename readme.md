@@ -149,5 +149,5 @@ If a job is fanned out, each parallel run gets its own indexed color-coded prefi
 
 Croner is based on the ideas and design of [PyCroner](https://github.com/AcidBurnHen/pycroner), which started as a personal tool and became widely adopted for its simplicity and cross-platform nature.
 
-The Rust rewrite aims to carry that legacy forward — faster, safer, and ready for heavier workloads.
+The Rust rewrite aims to carry that legacy forward, faster, safer, and ready for heavier workloads.
 
